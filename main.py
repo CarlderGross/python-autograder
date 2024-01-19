@@ -1,6 +1,7 @@
 import subprocess
 import os
 import re
+import shutil
 
 assignmentPath = "FacsimileAssignment.zip"
 
@@ -36,4 +37,4 @@ for studentFolder in os.scandir("Temp"):
         #TODO: add interface to specify which file is desired
     
 
-#TODO: empty the temp folder after use
+shutil.rmtree("Temp")
