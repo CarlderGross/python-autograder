@@ -33,6 +33,7 @@ for studentFolder in os.scandir("Temp"):
     if (0 < len(pythonFiles) < 2):
         runPythonFile(os.path.abspath(pythonFiles[0]))
     else:
+        print("Could not run project in "+studentFolder.name)
         print(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
         #TODO: add interface to specify which file is desired
     
