@@ -5,17 +5,30 @@ import shutil
 
 assignmentPath = "FacsimileAssignment.zip"
 
+#TODO: actually read test cases from file
+testCases = { #input : expected output
+    1 : 2
+    }
+
+#Unzip assignment
 if (not os.path.exists("Temp")):
     os.mkdir("Temp") #make the temp folder, if it doesn't exist already
     #this folder will be the destination of extracted files from the assignment
-
-#unzip assignment into temp folder
-subprocess.run("tar -xf "+assignmentPath+" -C Temp")
+subprocess.run("tar -xf "+assignmentPath+" -C Temp") #unzip assignment into temp
 
 def runPythonFile(filePath):
-    subprocess.run("py \""+filePath+"\"")
+    outs = []
+    print("Running "+filePath)
+    runningFile = subprocess.Popen("py \""+filePath+"\"", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for valueIn in testCases:
+        result, ignore = runningFile.communicate("1\n")
+        #this may close stdin after sending, which is bad
+        #try accessing stdin directly instead?
+        outs.append(result) #TODO: replace this to actually analyze later
+    runningFile.terminate() #when we're out of test cases, we're done
+    print(outs)
+        
 
-#TODO: REPLACE PSEUDOCODE
 for studentFolder in os.scandir("Temp"):
     #print(studentFolder)
     #find the most recent revision
