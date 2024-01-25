@@ -1,9 +1,7 @@
 import subprocess
 import os
 import re
-#import shutil
 import tempfile
-#import io
 
 assignmentPath = "FacsimileAssignment.zip"
 
@@ -27,7 +25,7 @@ def runPythonTests(filePath):
     runningFile = subprocess.Popen("py \""+filePath+"\"", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     output = runningFile.communicate(inputBuffer) #will be a tuple, with the second value as None
     #anything using normal python input (which is most things) will throw EOFError after all test cases have been read; this is probably fine
-    print(output[0]) #TODO: replace with actual read
+    return output[0]
 
 with tempfile.TemporaryDirectory() as Temp:
     #Unzip assignment
@@ -46,11 +44,19 @@ with tempfile.TemporaryDirectory() as Temp:
             if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
                 pythonFiles.append(file)
         if (0 < len(pythonFiles) < 2):
-            runPythonTests(os.path.abspath(pythonFiles[0]))
+            result = runPythonTests(os.path.abspath(pythonFiles[0]))
+            inputPrompts = []
+            #identify which parts are the response and which parts are hardcoded inputs
+                #read all files directly, and identify any direct strings in input() blocks
+            promptPattern = ""
+            for prompt in inputPrompts:
+                promptPattern += prompt+" |"
+            promptPattern = promptPattern.substring(0, len(promptPattern)-2) #delete the last extraneous segment
+            re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
+            print(result)
+            #TODO: parse the results
         else:
+            #TODO: preferentially run main.py or projectname.py before asking for help
             print("Could not run project in "+studentFolder.name)
             print(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
             #TODO: add interface to specify which file is desired
-    
-
-#shutil.rmtree("Temp")
