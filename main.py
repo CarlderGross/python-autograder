@@ -45,14 +45,29 @@ with tempfile.TemporaryDirectory() as Temp:
                 pythonFiles.append(file)
         if (0 < len(pythonFiles) < 2):
             result = runPythonTests(os.path.abspath(pythonFiles[0]))
+            #identify which parts are the hardcoded prompts and which parts are the actual output
+            #this is done by reading the code directly and identifying strings in input blocks
             inputPrompts = []
-            #identify which parts are the response and which parts are hardcoded inputs
-                #read all files directly, and identify any direct strings in input() blocks
+            for file in pythonFiles:
+                with open(file, 'r') as codeFile:
+                    for line in codeFile:
+                        inputIndex = line.find("input(")
+                        if (inputIndex >= 0):
+                            p_string = line[inputIndex:]
+                            endParen = p_string.find(")")
+                            p_string = p_string[6:endParen]
+                            if (p_string[0] == "\"" and p_string[-1] == "\""): #if the interior of the input() was a direct string rather than a variable
+                                p_string.strip() #strip whitespace
+                                p_string = p_string[1:-1] #remove first and last characters (quotation marks)
+                                inputPrompts.append(p_string) #we have now identified one of the input prompts
             promptPattern = ""
             for prompt in inputPrompts:
-                promptPattern += prompt+" |"
-            promptPattern = promptPattern.substring(0, len(promptPattern)-2) #delete the last extraneous segment
-            re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
+                promptPattern += ""+prompt+"|"
+            promptPattern = promptPattern[0:len(promptPattern)-1] #delete the last extraneous separator, add parens
+            #print(promptPattern)
+            #promptPattern = re.compile(promptPattern)
+            if (promptPattern):
+                result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
             print(result)
             #TODO: parse the results
         else:
