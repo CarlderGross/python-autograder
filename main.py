@@ -74,6 +74,7 @@ with tempfile.TemporaryDirectory() as Temp:
                     for i, item in enumerate(result): #clean the results of excess newlines
                         result[i] = item.strip()
                     tup_result = tuple(result[1:len(expectedOut)+1])
+                    #TODO: provide results to .csv file
                     print(expectedOut)
                     print(tup_result)
                     if (expectedOut == tup_result):
@@ -81,7 +82,6 @@ with tempfile.TemporaryDirectory() as Temp:
                     else:
                         print("Fail!")
                 #currently has a newline character at the end of each result except the first, which is an empty string
-            #TODO: parse the results
         else:
             #TODO: preferentially run main.py or projectname.py before asking for help
             print("Could not run project in "+studentFolder.name)
