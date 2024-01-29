@@ -7,10 +7,10 @@ assignmentPath = "FacsimileAssignment.zip"
 
 #TODO: actually read test cases from file
 testCases = { #input : expected output, stored as tuples because there may be more than one
-    (1,) : (2,),
-    (2,) : (3,),
-    (5,) : (6,),
-    (7,) : (8,)
+    (1,) : ("2",),
+    (2,) : ("3",),
+    (5,) : ("6",),
+    (7,) : ("8",)
     }
 
 def runPythonTests(filePath):
@@ -67,10 +67,19 @@ with tempfile.TemporaryDirectory() as Temp:
             results = runPythonTests(os.path.abspath(pythonFiles[0]))
             #identify which parts are the hardcoded prompts and which parts are the actual output
             promptPattern = inputPromptPattern(file)
-            for result in results:
+            for index, result in enumerate(results):
+                expectedOut = list(testCases.values())[index]
                 if (promptPattern):
                     result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
-                print(result)
+                    for i, item in enumerate(result): #clean the results of excess newlines
+                        result[i] = item.strip()
+                    tup_result = tuple(result[1:len(expectedOut)+1])
+                    print(expectedOut)
+                    print(tup_result)
+                    if (expectedOut == tup_result):
+                        print("Success!")
+                    else:
+                        print("Fail!")
                 #currently has a newline character at the end of each result except the first, which is an empty string
             #TODO: parse the results
         else:
