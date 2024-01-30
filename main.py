@@ -2,8 +2,10 @@ import subprocess
 import os
 import re
 import tempfile
+from tkinter import Tk, filedialog
 
-assignmentPath = "FacsimileAssignment.zip"
+Tk().withdraw() #temporary: don't create a full window for now
+assignmentPath = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
 
 #TODO: actually read test cases from file
 testCases = { #input : expected output, stored as tuples because there may be more than one
