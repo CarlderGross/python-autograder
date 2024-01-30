@@ -82,7 +82,12 @@ with tempfile.TemporaryDirectory() as Temp:
                     if (expectedOut == tup_result):
                         print("Success!")
                     else:
-                        print("Fail!")
+                        if (len(expectedOut) == len(tup_result)):
+                            for i, element in enumerate(expectedOut):
+                                if (element in tup_result[i]):
+                                    print("Flagged!")
+                        else:
+                            print("Fail!")
                 #currently has a newline character at the end of each result except the first, which is an empty string
         else:
             #TODO: preferentially run main.py or projectname.py before asking for help
