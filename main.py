@@ -49,6 +49,34 @@ def inputPromptPattern(file): #parses a python file, and returns a regex pattern
     promptPattern = promptPattern[0:len(promptPattern)-1] #delete the last extraneous separator
     return promptPattern
 
+def processResults(results):
+    #identify which parts are the hardcoded prompts and which parts are the actual output
+    promptPattern = inputPromptPattern(file)
+    for index, result in enumerate(results):
+        expectedOut = list(testCases.values())[index]
+        if (promptPattern):
+            result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
+            for i, item in enumerate(result): #clean the results of excess newlines
+                result[i] = item.strip()
+            tup_result = tuple(result[1:len(expectedOut)+1])
+            print(expectedOut)
+            print(tup_result)
+            if (expectedOut == tup_result):
+                print("Success!")
+            else:
+                if (len(expectedOut) == len(tup_result)):
+                    failedFlags = len(expectedOut)
+                    for i, element in enumerate(expectedOut):
+                        if (element in tup_result[i]):
+                            failedFlags -= 1
+                    assert failedFlags >= 0
+                    if (failedFlags == 0):
+                        print("Flagged!")
+                    else:
+                        print("Fail!")
+                else:
+                    print("Fail!")
+
 with tempfile.TemporaryDirectory() as Temp:
     #Unzip assignment
     subprocess.run("tar -xf "+assignmentPath+" -C "+os.path.abspath(Temp))
@@ -62,35 +90,21 @@ with tempfile.TemporaryDirectory() as Temp:
                 latestRevision = revisionFolder
         #get the file inside the folder
         pythonFiles = []
+        results = None
         for file in os.scandir(latestRevision):
             if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
                 pythonFiles.append(file)
         if (0 < len(pythonFiles) < 2):
             results = runPythonTests(os.path.abspath(pythonFiles[0]))
-            #identify which parts are the hardcoded prompts and which parts are the actual output
-            promptPattern = inputPromptPattern(file)
-            for index, result in enumerate(results):
-                expectedOut = list(testCases.values())[index]
-                if (promptPattern):
-                    result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
-                    for i, item in enumerate(result): #clean the results of excess newlines
-                        result[i] = item.strip()
-                    tup_result = tuple(result[1:len(expectedOut)+1])
-                    #TODO: provide results to .csv file
-                    print(expectedOut)
-                    print(tup_result)
-                    if (expectedOut == tup_result):
-                        print("Success!")
-                    else:
-                        if (len(expectedOut) == len(tup_result)):
-                            for i, element in enumerate(expectedOut):
-                                if (element in tup_result[i]):
-                                    print("Flagged!")
-                        else:
-                            print("Fail!")
-                #currently has a newline character at the end of each result except the first, which is an empty string
         else:
-            #TODO: preferentially run main.py or projectname.py before asking for help
-            print("Could not run project in "+studentFolder.name)
-            print(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
-            #TODO: add interface to specify which file is desired
+            for file in pythonFiles:
+                if (re.match("[Mm]ain\\.py")): #preferentially run main.py
+                    results = runPythonTests(os.path.abspath(file))
+                    break
+                #TODO: also identify projectname.py
+            if (not results): #if results is still none, since none is falsey
+                print("Could not identify main file in "+studentFolder.name)
+                print(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
+                #TODO: add interface to specify which file is desired
+        processResults(results)
+        #TODO: provide results to .csv file
