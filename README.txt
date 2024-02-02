@@ -1,0 +1,3 @@
+Output will be provided in two files: summary.csv and flagged.csv.
+The summary file contains the basic scores for each student, plus the number of failed outputs that were flagged by the software.
+A failed case will be flagged if it contains the expected result but is not identical to it. For example, if a "3" was expected, flagged outputs may include "Your number is 3" and "Error on line 3". All flagged runs are provided in detail in flagged.csv, so you can check if they were legitimate failures or simply formatting mistakes.
