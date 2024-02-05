@@ -8,6 +8,43 @@ from tkinter import Tk, filedialog
 Tk().withdraw() #temporary: don't create a full window for now
 assignmentPath = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
 
+#Raises ValueError when it cannot match all inputs to outputs
+#Raises ValueError when it can match some outputs to inputs, but not all
+#Returns a dict if there are both inputs and outputs
+#Returns a list if there are only outputs
+def buildTestCases(expectedOutFiles, dataFiles=None):
+    if (dataFiles):
+        if (len(expectedOutFiles) == len(dataFiles)):
+            finalDict = {}
+            for i, datfile in enumerate(dataFiles):
+                with open(datfile, 'r') as datFile, open(expectedOutFiles[i], 'r') as outFile:
+                    inputLines = datFile.readlines()
+                    outputLines = outFile.readlines()
+                    if (len(inputLines) == len(outputLines)):
+                        for j, in_line in enumerate(inputLines):
+                            tup_ins = tuple(in_line.split())
+                            tup_outs = tuple(outputLines[j].split()) #TODO: make sure this makes sense with the output files
+                            finalDict[tup_ins] = tup_outs
+                    else:
+                        raise ValueError(f"Inputs file at index {i} has a different number of test cases than outputs file at that index. Check your file order to make sure they are associated correctly.")
+            return finalDict
+        else:
+            mismatchType = ""
+            if (len(expectedOutFiles > len(dataFiles))):
+                mismatchType = "some output files have no associated inputs"
+            else:
+                mismatchType = "some input files have no associated outputs"
+            raise ValueError(f"Mismatched number of input and output files: {mismatchType}")
+    else:
+        outputsList = []
+        for file in expectedOutFiles:
+            with open(file) as outsFile:
+                lines = outsFile.readlines()
+                for line in lines:
+                    tup_outs = tuple(line.split()) #TODO: make sure this makes sense with the output files
+                    outputsList.append(tup_outs)
+        return outputsList
+
 #TODO: actually read test cases from file
 testCases = { #input : expected output, stored as tuples because there may be more than one
     (1,) : ("2",),
