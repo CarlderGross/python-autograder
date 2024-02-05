@@ -4,7 +4,7 @@ import re
 import shlex
 import tempfile
 import csv
-from tkinter import Tk, filedialog
+from tkinter import *
 
 #Constants
 SUMMARYTEMPLATE = {
@@ -176,9 +176,23 @@ def saveToCsv(list_summaryLines, list_flaggedLines):
             if (line["Name"] != currentName): #separate students with empty rows for readability
                 flagWriter.writerow(dict.fromkeys(FLAGPARAMS))
                 currentName = line["Name"]
+    
+root = Tk()
+root.title("Python Autograder")
+main_frame = ttk.frame(root, padding="3 3 12 12")
+main_frame.grid(column=0, row=0, sticky=(N, E, S, W))
+root.columnconfigure(0, weight=1)
+root.rowconfigure(0, weight=1)
 
-Tk().withdraw() #temporary: don't create a full window for now
-assignmentPath = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
+assignmentPath = StringVar()
+
+assignmentPath_label = ttk.Label(main_frame, text="Assignment File:")
+assignmentPath_entry = ttk.Entry(main_frame, width=20, textvariable=assignmentPath)
+assignmentPath_browse = ttk.Button(main_frame, text="Browse...", command=lambda *args : assignmentPath.set(filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")]))) #uses lambda because a button passes miscellaneous args that we aren't using
+
+assignmentPath_label.grid(column=0, row=0, sticky=(N, W))
+assignmentPath_entry.grid(column=1, row=0, sticky=(N, W))
+assignmentPath_browse.grid(column=2, row=0, sticky=(N, W))
 
 #TODO: actually read test cases from file
 tests = { #input : expected output, stored as tuples because there may be more than one
