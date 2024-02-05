@@ -1,6 +1,7 @@
 import subprocess
 import os
 import re
+import shlex
 import tempfile
 import csv
 from tkinter import Tk, filedialog
@@ -22,8 +23,8 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
                     outputLines = outFile.readlines()
                     if (len(inputLines) == len(outputLines)):
                         for j, in_line in enumerate(inputLines):
-                            tup_ins = tuple(in_line.split())
-                            tup_outs = tuple(outputLines[j].split()) #TODO: make sure this makes sense with the output files
+                            tup_ins = tuple(shlex.split(in_line)) #use shlex to prevent splitting of string literals with spaces in them
+                            tup_outs = tuple(shlex.split(outputLines[j])) #TODO: make sure this makes sense with the output files
                             finalDict[tup_ins] = tup_outs
                     else:
                         raise ValueError(f"Inputs file at index {i} has a different number of test cases than outputs file at that index. Check your file order to make sure they are associated correctly.")
@@ -41,7 +42,7 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
             with open(file) as outsFile:
                 lines = outsFile.readlines()
                 for line in lines:
-                    tup_outs = tuple(line.split()) #TODO: make sure this makes sense with the output files
+                    tup_outs = tuple(shlex.split(line)) #TODO: make sure this makes sense with the output files
                     outputsList.append(tup_outs)
         return outputsList
 
