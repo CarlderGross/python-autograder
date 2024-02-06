@@ -5,6 +5,7 @@ import shlex
 import tempfile
 import csv
 from tkinter import *
+from tkinter import ttk, filedialog, messagebox
 
 #Constants
 SUMMARYTEMPLATE = {
@@ -34,15 +35,15 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
                             tup_outs = tuple(shlex.split(outputLines[j])) #TODO: make sure this makes sense with the output files
                             finalDict[tup_ins] = tup_outs
                     else:
-                        raise ValueError(f"Inputs file at index {i} has a different number of test cases than outputs file at that index. Check your file order to make sure they are associated correctly.")
+                        raise ValueError(f"Inputs file at index {i} has a different number of test cases than associated outputs file. Check your file order to make sure they are associated correctly.")
             return finalDict
         else:
             mismatchType = ""
-            if (len(expectedOutFiles > len(dataFiles))):
-                mismatchType = "some output files have no associated inputs"
+            if (len(expectedOutFiles) > len(dataFiles)):
+                mismatchType = "some output files have no associated inputs!"
             else:
-                mismatchType = "some input files have no associated outputs"
-            raise ValueError(f"Mismatched number of input and output files: {mismatchType}")
+                mismatchType = "some input files have no associated outputs!"
+            raise ValueError(mismatchType)
     else:
         outputsList = []
         for file in expectedOutFiles:
@@ -92,7 +93,7 @@ def runTestsOnAssignment(assignmentPath, testCases):
     
     with tempfile.TemporaryDirectory() as Temp:
         #Unzip assignment
-        subprocess.run("tar -xf "+assignmentPath+" -C "+os.path.abspath(Temp))
+        subprocess.run("tar -xf \""+assignmentPath+"\" -C "+os.path.abspath(Temp))
         
         for studentFolder in os.scandir(Temp):
             #obtain the student name and initialize the summary dict
@@ -179,28 +180,119 @@ def saveToCsv(list_summaryLines, list_flaggedLines):
     
 root = Tk()
 root.title("Python Autograder")
-main_frame = ttk.frame(root, padding="3 3 12 12")
+main_frame = ttk.Frame(root, padding="3 3 12 12")
 main_frame.grid(column=0, row=0, sticky=(N, E, S, W))
 root.columnconfigure(0, weight=1)
 root.rowconfigure(0, weight=1)
 
-assignmentPath = StringVar()
+assignment_frame = ttk.Frame(main_frame)
+assignment_frame.grid(column=0, row=0, sticky=(N, W))
 
-assignmentPath_label = ttk.Label(main_frame, text="Assignment File:")
-assignmentPath_entry = ttk.Entry(main_frame, width=20, textvariable=assignmentPath)
-assignmentPath_browse = ttk.Button(main_frame, text="Browse...", command=lambda *args : assignmentPath.set(filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")]))) #uses lambda because a button passes miscellaneous args that we aren't using
+assignmentPath = StringVar()
+assignmentPath_label = ttk.Label(assignment_frame, text="Assignment File:")
+assignmentPath_entry = ttk.Entry(assignment_frame, width=100, textvariable=assignmentPath)
+assignmentPath_browse = ttk.Button(assignment_frame, text="Browse...", command=lambda: assignmentPath.set(filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")]))) #uses lambda because a button passes miscellaneous args that we aren't using
 
 assignmentPath_label.grid(column=0, row=0, sticky=(N, W))
-assignmentPath_entry.grid(column=1, row=0, sticky=(N, W))
-assignmentPath_browse.grid(column=2, row=0, sticky=(N, W))
+assignmentPath_entry.grid(column=0, row=1, sticky=(N, W, E))
+assignmentPath_browse.grid(column=1, row=1, sticky=(N, W))
+
+inputFiles = []
+outputFiles= []
+
+filelist_frame = ttk.Frame(main_frame)
+filelist_frame.columnconfigure((0, 1), weight=1, uniform="column")
+filelist_frame.grid(column=0, row=1, sticky=(N, W, S, E))
+
+indata_label = ttk.Label(filelist_frame, text="Input Datafiles:")
+outdata_label = ttk.Label(filelist_frame, text="Output Datafiles:")
+
+indata_label.grid(column=0, row=0, sticky=(N, W))
+outdata_label.grid(column=1, row=0, sticky=(N, W))
+
+inlist_frame = ttk.Frame(filelist_frame)
+inlist_frame.grid(column=0, row=1, sticky=(N, W, S, E))
+outlist_frame = ttk.Frame(filelist_frame)
+outlist_frame.grid(column=1, row=1, sticky=(N, W, S, E))
+
+def redrawInputFiles():
+    for child in inlist_frame.winfo_children():
+        child.grid_forget()
+        child.destroy()
+    for index, element in enumerate(inputFiles):
+        elementLabel = ttk.Label(inlist_frame, text=os.path.abspath(element))
+        elementLabel.grid(column=0, row=index+1, sticky=(W))
+        removalButton = ttk.Button(inlist_frame, text="X", width=1.1, command=lambda: removeInputFile(index))
+        removalButton.grid(column=1, row=index+1, sticky=W)
+        
+def redrawOutputFiles():
+    for child in outlist_frame.winfo_children():
+        child.grid_forget()
+        child.destroy()
+    for index, element in enumerate(outputFiles):
+        elementLabel = ttk.Label(outlist_frame, text=os.path.abspath(element))
+        elementLabel.grid(column=0, row=index+1, sticky=(N, W))
+        removalButton = ttk.Button(outlist_frame, text="X", width=1.1, command=lambda: removeOutputFile(index))
+        removalButton.grid(column=1, row=index+1, sticky=W)
+        
+#whenever the list changes, we need to redraw it
+def addInputFiles(*args): #must include arbitrary args and then ignore them, because a button passes args to the called function
+    global inputFiles #can't return anything because this will occur inside a button
+    inputFiles += filedialog.askopenfilenames(filetypes=[("Data files", "*.dat")])
+    redrawInputFiles()
+    
+def addOutputFiles(*args):
+    global outputFiles
+    outputFiles += filedialog.askopenfilenames(filetypes=[("Text files", "*.txt")])
+    redrawOutputFiles()
+    
+def removeInputFile(index):
+    del inputFiles[index]
+    redrawInputFiles()
+    
+def removeOutputFile(index):
+    del outputFiles[index]
+    redrawOutputFiles()
+
+indata_browse = ttk.Button(filelist_frame, text="Browse...", command=addInputFiles)
+outdata_browse = ttk.Button(filelist_frame, text="Browse...", command=addOutputFiles)
+
+indata_browse.grid(column=0, row=2, sticky=(N, W))
+outdata_browse.grid(column=1, row=2, sticky=(N, W))
+
+assoc_warning_label = ttk.Label(main_frame, text="Make sure each input file is associated with an output file!")
+assoc_warning_label.grid(column=0, row=2, sticky=(N, W), columnspan=2)
+
+def runTestsCallback(*args):
+    global inputFiles, outputFiles
+    if (not assignmentPath.get()):
+        messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: no assignment file selected!")
+        return -1
+    if (not outputFiles):
+        messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: no expected output files provided!")
+        return -1
+    try:
+        tests = buildTestCases(outputFiles, dataFiles=inputFiles)
+    except ValueError as e:
+        messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: "+str(e))
+    else:
+        #print("Running tests...")
+        summary, flagged = runTestsOnAssignment(assignmentPath.get(), tests)
+        saveToCsv(summary, flagged)
+        messagebox.showinfo(parent=root, title="Success", message="Tests run successfully!")
+
+runTests_button = ttk.Button(main_frame, text="Run Tests", default="active", command=runTestsCallback)
+runTests_button.grid(column=1, row=2, sticky=(S, E))
+
+root.mainloop()
 
 #TODO: actually read test cases from file
-tests = { #input : expected output, stored as tuples because there may be more than one
-    (1,) : ("2",),
-    (2,) : ("3",),
-    (5,) : ("6",),
-    (7,) : ("8",)
-    }
+#tests = { #input : expected output, stored as tuples because there may be more than one
+ #   (1,) : ("2",),
+  #  (2,) : ("3",),
+   # (5,) : ("6",),
+    #(7,) : ("8",)
+    #}
 
-summary, flagged = runTestsOnAssignment(assignmentPath, tests) #decompose the returned tuple
-saveToCsv(summary, flagged)
+#summary, flagged = runTestsOnAssignment(assignmentPath, tests) #decompose the returned tuple
+#saveToCsv(summary, flagged)
