@@ -1,8 +1,9 @@
 import subprocess
 import os
+import tempfile
+from pathlib import Path
 import re
 import shlex
-import tempfile
 import csv
 from tkinter import *
 from tkinter import ttk, filedialog, messagebox
@@ -87,6 +88,21 @@ def inputPromptPattern(file): #parses a python file, and returns a regex pattern
     promptPattern = promptPattern[0:len(promptPattern)-1] #delete the last extraneous separator
     return promptPattern
 
+def findPythonFiles(folder):
+    pythonFiles = []
+    zips = []
+    for file in os.scandir(folder):
+        if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
+            pythonFiles.append(file)
+        elif (re.match((".*\\.zip", file.name))):
+            zips.append(file)
+    if (len(pythonFiles) == 0) and (len(zips) == 1):
+        zipname = Path(os.path.abspath(zips[0])).stem() #get the basic name of the zip, which will be the new folder
+        subprocess.run("tar -xf \""+os.path.abspath(zips[0])+"\"") #unzip
+        assert os.path.isdir(os.path.join(folder, zipname)) #debug
+        findPythonFiles(os.path.join(folder, zipname)) #recursively find files in the new folder
+    return pythonFiles
+
 def runTestsOnAssignment(assignmentPath, testCases):
     summaryLines = []
     flaggedLines = []
@@ -106,31 +122,36 @@ def runTestsOnAssignment(assignmentPath, testCases):
             latestRevision = None
             for revisionFolder in os.scandir(studentFolder):
                 #second element will always be revision number ("Revision 1 - On time")
-                if ((latestRevision == None) or (int(revisionFolder.name.split()[1]) > latestRevision.name.split()[1])):  
+                if ((latestRevision == None) or (int(revisionFolder.name.split()[1]) > int(latestRevision.name.split()[1]))):  
                     latestRevision = revisionFolder
             #get the file inside the folder
-            pythonFiles = []
-            results = None
-            for file in os.scandir(latestRevision):
-                if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
-                    pythonFiles.append(file)
+            pythonFiles = findPythonFiles(latestRevision)
+            targetFile = None
+            #figure out what file to run
             if (0 < len(pythonFiles) < 2):
-                results = runPythonTests(os.path.abspath(pythonFiles[0]), testCases)
+                #if there's only one file, use that
+                targetFile = pythonFiles[0]
             else:
                 for file in pythonFiles:
                     if (re.match("[Mm]ain\\.py")): #preferentially run main.py
-                        results = runPythonTests(os.path.abspath(file))
+                        targetFile = file
                         break
-                    #TODO: also identify projectname.py
-                if (not results): #if results is still none, since none is falsey
+                        #TODO: also identify projectname.py
+                if (not file): #if no file was identified as main
                     print("Could not identify main file in "+studentFolder.name)
                     print(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
-                    #TODO: add interface to specify which file is desired
-    
-            promptPattern = inputPromptPattern(file)
+                    break #TODO: add interface to specify which file is desired
+                        
+            results = runPythonTests(os.path.abspath(targetFile), testCases)
+            promptPattern = inputPromptPattern(targetFile)
             
-            for index, result in enumerate(results):
-                expectedOut = list(testCases.values())[index]
+            if (isinstance(testCases, dict)):
+                expectedResults = list(testCases.values())
+            else:
+                assert isinstance(testCases, list)
+                expectedResults = testCases
+            for index, expectedOut in enumerate(expectedResults):
+                result = results[index]
                 #separate hardcoded prompts from actual output
                 if (promptPattern):
                     result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
@@ -168,16 +189,18 @@ def saveToCsv(list_summaryLines, list_flaggedLines):
         summaryWriter.writeheader()
         for line in list_summaryLines:
             summaryWriter.writerow(line)
-    with open("flagged.csv", "w", newline="") as flagsFile:
-        flagWriter = csv.DictWriter(flagsFile, fieldnames=FLAGPARAMS)
-        flagWriter.writeheader()
-        currentName = list_flaggedLines[0]["Name"]
-        for line in list_flaggedLines:
-            flagWriter.writerow(line)
-            if (line["Name"] != currentName): #separate students with empty rows for readability
-                flagWriter.writerow(dict.fromkeys(FLAGPARAMS))
-                currentName = line["Name"]
-    
+    if (list_flaggedLines):
+        with open("flagged.csv", "w", newline="") as flagsFile:
+            flagWriter = csv.DictWriter(flagsFile, fieldnames=FLAGPARAMS)
+            flagWriter.writeheader()
+            currentName = list_flaggedLines[0]["Name"]
+            for line in list_flaggedLines:
+                flagWriter.writerow(line)
+                if (line["Name"] != currentName): #separate students with empty rows for readability
+                    flagWriter.writerow(dict.fromkeys(FLAGPARAMS))
+                    currentName = line["Name"]
+
+#construct interface
 root = Tk()
 root.title("Python Autograder")
 main_frame = ttk.Frame(root, padding="3 3 12 12")
@@ -215,6 +238,7 @@ inlist_frame.grid(column=0, row=1, sticky=(N, W, S, E))
 outlist_frame = ttk.Frame(filelist_frame)
 outlist_frame.grid(column=1, row=1, sticky=(N, W, S, E))
 
+#interface functions
 def redrawInputFiles():
     for child in inlist_frame.winfo_children():
         child.grid_forget()
@@ -277,22 +301,17 @@ def runTestsCallback(*args):
         messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: "+str(e))
     else:
         #print("Running tests...")
-        summary, flagged = runTestsOnAssignment(assignmentPath.get(), tests)
-        saveToCsv(summary, flagged)
-        messagebox.showinfo(parent=root, title="Success", message="Tests run successfully!")
+        try:
+            summary, flagged = runTestsOnAssignment(assignmentPath.get(), tests)
+            saveToCsv(summary, flagged)
+            messagebox.showinfo(parent=root, title="Success", message="Tests run successfully!")
+        except Exception as e:
+            #make sure the user knows what's going on
+            messagebox.showinfo(parent=root, title="Error", message="Failed to run tests: "+str(e))
+            root.destroy()
+            raise
 
 runTests_button = ttk.Button(main_frame, text="Run Tests", default="active", command=runTestsCallback)
 runTests_button.grid(column=1, row=2, sticky=(S, E))
 
 root.mainloop()
-
-#TODO: actually read test cases from file
-#tests = { #input : expected output, stored as tuples because there may be more than one
- #   (1,) : ("2",),
-  #  (2,) : ("3",),
-   # (5,) : ("6",),
-    #(7,) : ("8",)
-    #}
-
-#summary, flagged = runTestsOnAssignment(assignmentPath, tests) #decompose the returned tuple
-#saveToCsv(summary, flagged)
