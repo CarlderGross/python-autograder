@@ -7,6 +7,8 @@ import shlex
 import csv
 from tkinter import *
 from tkinter import ttk, filedialog, messagebox
+import traceback
+import datetime
 
 #Constants
 SUMMARYTEMPLATE = {
@@ -17,6 +19,12 @@ SUMMARYTEMPLATE = {
     "Flagged" : 0
     }
 FLAGPARAMS = ["Name", "Input", "Expected", "Actual"]
+
+#set up logging
+import logging #apparently it works better here?
+if(not os.path.isdir("logs")):
+    os.mkdir("logs")
+logging.basicConfig(filename="logs/latest.log", filemode="w", level=logging.DEBUG, format="%(levelname)s:%(message)s", force=True)
 
 def buildTestCases(expectedOutFiles, dataFiles=None):
     #Raises ValueError when it cannot match all inputs to outputs
@@ -112,6 +120,7 @@ def runTestsOnAssignment(assignmentPath, testCases):
         subprocess.run("tar -xf \""+assignmentPath+"\" -C "+os.path.abspath(Temp))
         
         for studentFolder in os.scandir(Temp):
+            logging.info("Testing "+os.path.abspath(studentFolder))
             #obtain the student name and initialize the summary dict
             studentName = "".join(studentFolder.name.split(" ", 2)[:2])
             summary = SUMMARYTEMPLATE.copy()
@@ -137,9 +146,9 @@ def runTestsOnAssignment(assignmentPath, testCases):
                         targetFile = file
                         break
                         #TODO: also identify projectname.py
-                if (not file): #if no file was identified as main
-                    print("Could not identify main file in "+studentFolder.name)
-                    print(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
+                if (not targetFile): #if no file was identified as main
+                    logging.error("Could not identify main file in "+studentFolder.name)
+                    logging.error(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
                     break #TODO: add interface to specify which file is desired
                         
             results = runPythonTests(os.path.abspath(targetFile), testCases)
@@ -159,7 +168,10 @@ def runTestsOnAssignment(assignmentPath, testCases):
                         result[i] = item.strip()
                 #use tuple comparison to identify passed or failed cases
                 tup_result = tuple(result[1:len(expectedOut)+1])
+                logging.debug(expectedOut)
+                logging.debug(tup_result)
                 if (expectedOut == tup_result):
+                    logging.debug("Pass")
                     summary["Passed"] += 1
                 else:
                     if (len(expectedOut) == len(tup_result)):
@@ -169,6 +181,7 @@ def runTestsOnAssignment(assignmentPath, testCases):
                                 failedElements -= 1
                         assert failedElements >= 0
                         if (failedElements == 0):
+                            logging.debug("Flag")
                             summary["Flagged"] += 1
                             #dump the details of the output to a dict, then add to the list of flagged outputs
                             flaggedOut = dict.fromkeys(FLAGPARAMS)
@@ -177,6 +190,7 @@ def runTestsOnAssignment(assignmentPath, testCases):
                             flaggedOut["Expected"] = expectedOut
                             flaggedOut["Actual"] = tup_result
                             flaggedLines.append(flaggedOut)
+                    logging.debug("Fail")
                     summary["Failed"] += 1
             summaryLines.append(summary)
     
@@ -289,23 +303,28 @@ assoc_warning_label.grid(column=0, row=2, sticky=(N, W), columnspan=2)
 
 def runTestsCallback(*args):
     global inputFiles, outputFiles
+    logging.info("Attempting to run tests on "+assignmentPath.get())
     if (not assignmentPath.get()):
+        logging.error("Cannot run tests: no assignment file selected!")
         messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: no assignment file selected!")
         return -1
     if (not outputFiles):
+        logging.error("Cannot run tests: no expected output files provided!")
         messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: no expected output files provided!")
         return -1
     try:
         tests = buildTestCases(outputFiles, dataFiles=inputFiles)
     except ValueError as e:
+        logging.error("Cannot run tests: "+str(e))
         messagebox.showinfo(parent=root, title="Error", message="Cannot run tests: "+str(e))
     else:
-        #print("Running tests...")
+        logging.debug("Running tests...")
         try:
             summary, flagged = runTestsOnAssignment(assignmentPath.get(), tests)
             saveToCsv(summary, flagged)
             messagebox.showinfo(parent=root, title="Success", message="Tests run successfully!")
         except Exception as e:
+            logging.critical(traceback.format_exc())
             #make sure the user knows what's going on
             messagebox.showinfo(parent=root, title="Error", message="Failed to run tests: "+str(e))
             root.destroy()
@@ -315,3 +334,7 @@ runTests_button = ttk.Button(main_frame, text="Run Tests", default="active", com
 runTests_button.grid(column=1, row=2, sticky=(S, E))
 
 root.mainloop()
+#save logs after root closes
+with open("logs/"+datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")+".log", mode="a") as permLog, open("logs/latest.log", mode="r") as latestLog:
+    for line in latestLog:
+        permLog.write(line)
