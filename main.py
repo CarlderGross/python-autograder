@@ -108,9 +108,10 @@ def findPythonFiles(folder):
     for file in os.scandir(folder):
         if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
             pythonFiles.append(file)
-        elif (re.match((".*\\.zip", file.name))):
+        elif (re.match(".*\\.zip", file.name)):
             zips.append(file)
     if (len(pythonFiles) == 0) and (len(zips) == 1):
+        logging.warning("No python file found in "+folder+", attempting to unzip detected zip file")
         zipname = Path(os.path.abspath(zips[0])).stem() #get the basic name of the zip, which will be the new folder
         newFolder = os.path.join(folder, zipname)
         subprocess.run("tar -xf \""+os.path.abspath(zips[0])+"\" -C "+newFolder) #unzip
@@ -167,54 +168,57 @@ def runTestsOnAssignment(assignmentPath, testCases):
                 assert isinstance(testCases, list)
                 expectedResults = testCases
                 results = runPythonTests(os.path.abspath(targetFile))
-                
-            #pad results if necessary, to prevent index out of bounds errors
-            while (len(results) < len(expectedResults)):
-                results.append("")
             
             for index, expectedOut in enumerate(expectedResults):
-                result = results[index]
-                logging.debug(result)
-                #separate hardcoded prompts from actual output
-                if (promptPattern):
-                    result = re.split(promptPattern, result)
-                else:
-                    #"split" the string into nothing and itself
-                    #regex split with no pattern actually splits it into one string per letter, plus an empty string at the beginning and end, which we don't want
-                    fakesplit = [""]
-                    fakesplit.append(result)
-                    result = fakesplit
-                logging.debug(result) #split the string along all known input prompts, leaving only the outputs
-                for i, item in enumerate(result): #clean the results of excess newlines
-                    result[i] = item.strip()
-                #use tuple comparison to identify passed or failed cases
-                logging.debug(result)
-                logging.debug("Pre-tuple result: "+str(result[1:len(expectedOut)+1]))
-                tup_result = tuple(result[1:len(expectedOut)+1])
-                logging.debug("Expected: " + str(expectedOut))
-                logging.debug("Received: " + str(tup_result))
-                if (expectedOut == tup_result):
-                    logging.debug("Pass")
-                    summary["Passed"] += 1
-                else:
-                    if (len(expectedOut) == len(tup_result)):
-                        failedElements = len(expectedOut)
-                        for i, element in enumerate(expectedOut):
-                            if (element in tup_result[i]):
-                                failedElements -= 1
-                        assert failedElements >= 0
-                        if (failedElements == 0):
-                            logging.debug("Flag")
-                            summary["Flagged"] += 1
-                            #dump the details of the output to a dict, then add to the list of flagged outputs
-                            flaggedOut = dict.fromkeys(FLAGPARAMS)
-                            flaggedOut["Name"] = studentName
-                            flaggedOut["Input"] = list(testCases.keys())[index]
-                            flaggedOut["Expected"] = expectedOut
-                            flaggedOut["Actual"] = tup_result
-                            flaggedLines.append(flaggedOut)
-                    logging.debug("Fail")
+                try:
+                    result = results[index]
+                except IndexError:
+                    logging.info("Fail: No output provided")
                     summary["Failed"] += 1
+                else:
+                    logging.debug(result)
+                    #separate hardcoded prompts from actual output
+                    if (promptPattern):
+                        result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
+                    else:
+                        #"split" the string into nothing and itself
+                        #regex split with no pattern actually splits it into one string per letter, plus an empty string at the beginning and end, which we don't want
+                        fakesplit = [""]
+                        fakesplit.append(result)
+                        result = fakesplit
+                    
+                    logging.debug(result)
+                    for i, item in enumerate(result): #clean the results of excess newlines
+                        result[i] = item.strip()
+                    
+                    #use tuple comparison to identify passed or failed cases
+                    logging.debug(result)
+                    logging.debug("Pre-tuple result: "+str(result[1:len(expectedOut)+1]))
+                    tup_result = tuple(result[1:len(expectedOut)+1])
+                    logging.debug("Expected: " + str(expectedOut))
+                    logging.debug("Received: " + str(tup_result))
+                    if (expectedOut == tup_result):
+                        logging.debug("Pass")
+                        summary["Passed"] += 1
+                    else:
+                        if (len(expectedOut) == len(tup_result)):
+                            failedElements = len(expectedOut)
+                            for i, element in enumerate(expectedOut):
+                                if (element in tup_result[i]):
+                                    failedElements -= 1
+                            assert failedElements >= 0
+                            if (failedElements == 0):
+                                logging.debug("Flag")
+                                summary["Flagged"] += 1
+                                #dump the details of the output to a dict, then add to the list of flagged outputs
+                                flaggedOut = dict.fromkeys(FLAGPARAMS)
+                                flaggedOut["Name"] = studentName
+                                flaggedOut["Input"] = list(testCases.keys())[index]
+                                flaggedOut["Expected"] = expectedOut
+                                flaggedOut["Actual"] = tup_result
+                                flaggedLines.append(flaggedOut)
+                        logging.debug("Fail")
+                        summary["Failed"] += 1
             summaryLines.append(summary)
     
     return(summaryLines, flaggedLines)
