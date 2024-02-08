@@ -63,18 +63,24 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
                     outputsList.append(tup_outs)
         return outputsList
 
-def runPythonTests(filePath, testCases):
+def runPythonTests(filePath, testInputs=None):
     outputs = []
-    for inputs in testCases:
-        #run the program separately for each test case, since we can't be sure that it will infinitely accept inputs
-        inputBuffer = ""
-        for item in inputs:
-            inputBuffer += str(item)+"\n" #files being tested are probably using input() which requests a string, but stdin expects bytes to be written to it
-            #run the subprocess, with stdin as the input stream
-        runningFile = subprocess.Popen("py \""+filePath+"\"", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        output = runningFile.communicate(inputBuffer) #will be a tuple, with the second value as None
-        #anything using normal python input (which is most things) will throw EOFError after all test cases have been read; this is probably fine
-        outputs.append(output[0])
+    if (testInputs):
+        for inputs in testInputs:
+            #run the program separately for each test case, since we can't be sure that it will infinitely accept inputs
+            inputBuffer = ""
+            for item in inputs:
+                inputBuffer += str(item)+"\n" #files being tested are probably using input() which requests a string, but stdin expects bytes to be written to it
+                #run the subprocess, with stdin as the input stream
+            runningFile = subprocess.Popen("py \""+filePath+"\"", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            output = runningFile.communicate(inputBuffer) #will be a tuple, with the second value as None
+            #anything using normal python input (which is most things) will throw EOFError after all test cases have been read; this is probably fine
+            runningFile.terminate()
+            outputs.append(output[0])
+    else:
+        output_process = subprocess.run("py \""+filePath+"\"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=100)
+        outputs = output_process.stdout.split("\n") #the outputs are actually the singular output split by line
+    logging.debug(outputs)
     return outputs
 
 def inputPromptPattern(file): #parses a python file, and returns a regex pattern to match all string literals passed as the prompt to input() blocks
@@ -106,9 +112,10 @@ def findPythonFiles(folder):
             zips.append(file)
     if (len(pythonFiles) == 0) and (len(zips) == 1):
         zipname = Path(os.path.abspath(zips[0])).stem() #get the basic name of the zip, which will be the new folder
-        subprocess.run("tar -xf \""+os.path.abspath(zips[0])+"\"") #unzip
-        assert os.path.isdir(os.path.join(folder, zipname)) #debug
-        findPythonFiles(os.path.join(folder, zipname)) #recursively find files in the new folder
+        newFolder = os.path.join(folder, zipname)
+        subprocess.run("tar -xf \""+os.path.abspath(zips[0])+"\" -C "+newFolder) #unzip
+        assert os.path.isdir(newFolder) #debug
+        findPythonFiles(newFolder) #recursively find files in the new folder
     return pythonFiles
 
 def runTestsOnAssignment(assignmentPath, testCases):
@@ -151,25 +158,41 @@ def runTestsOnAssignment(assignmentPath, testCases):
                     logging.error(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
                     break #TODO: add interface to specify which file is desired
                         
-            results = runPythonTests(os.path.abspath(targetFile), testCases)
             promptPattern = inputPromptPattern(targetFile)
             
             if (isinstance(testCases, dict)):
                 expectedResults = list(testCases.values())
+                results = runPythonTests(os.path.abspath(targetFile), testInputs=list(testCases.keys()))
             else:
                 assert isinstance(testCases, list)
                 expectedResults = testCases
+                results = runPythonTests(os.path.abspath(targetFile))
+                
+            #pad results if necessary, to prevent index out of bounds errors
+            while (len(results) < len(expectedResults)):
+                results.append("")
+            
             for index, expectedOut in enumerate(expectedResults):
                 result = results[index]
+                logging.debug(result)
                 #separate hardcoded prompts from actual output
                 if (promptPattern):
-                    result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
-                    for i, item in enumerate(result): #clean the results of excess newlines
-                        result[i] = item.strip()
+                    result = re.split(promptPattern, result)
+                else:
+                    #"split" the string into nothing and itself
+                    #regex split with no pattern actually splits it into one string per letter, plus an empty string at the beginning and end, which we don't want
+                    fakesplit = [""]
+                    fakesplit.append(result)
+                    result = fakesplit
+                logging.debug(result) #split the string along all known input prompts, leaving only the outputs
+                for i, item in enumerate(result): #clean the results of excess newlines
+                    result[i] = item.strip()
                 #use tuple comparison to identify passed or failed cases
+                logging.debug(result)
+                logging.debug("Pre-tuple result: "+str(result[1:len(expectedOut)+1]))
                 tup_result = tuple(result[1:len(expectedOut)+1])
-                logging.debug(expectedOut)
-                logging.debug(tup_result)
+                logging.debug("Expected: " + str(expectedOut))
+                logging.debug("Received: " + str(tup_result))
                 if (expectedOut == tup_result):
                     logging.debug("Pass")
                     summary["Passed"] += 1
