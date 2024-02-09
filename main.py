@@ -41,7 +41,7 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
                     if (len(inputLines) == len(outputLines)):
                         for j, in_line in enumerate(inputLines):
                             tup_ins = tuple(shlex.split(in_line)) #use shlex to prevent splitting of string literals with spaces in them
-                            tup_outs = tuple(shlex.split(outputLines[j])) #TODO: make sure this makes sense with the output files
+                            tup_outs = tuple(shlex.split(outputLines[j]))
                             finalDict[tup_ins] = tup_outs
                     else:
                         raise ValueError(f"Inputs file at index {i} has a different number of test cases than associated outputs file. Check your file order to make sure they are associated correctly.")
@@ -59,7 +59,7 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
             with open(file) as outsFile:
                 lines = outsFile.readlines()
                 for line in lines:
-                    tup_outs = tuple(shlex.split(line)) #TODO: make sure this makes sense with the output files
+                    tup_outs = tuple(shlex.split(line))
                     outputsList.append(tup_outs)
         return outputsList
 
@@ -105,18 +105,25 @@ def inputPromptPattern(file): #parses a python file, and returns a regex pattern
 def findPythonFiles(folder):
     pythonFiles = []
     zips = []
+    subfolders = []
     for file in os.scandir(folder):
         if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
             pythonFiles.append(file)
         elif (re.match(".*\\.zip", file.name)):
             zips.append(file)
-    if (len(pythonFiles) == 0) and (len(zips) == 1):
-        logging.warning("No python file found in "+folder+", attempting to unzip detected zip file")
+        elif (os.path.isdir(file)):
+            subfolders.append(file)
+    if (len(pythonFiles) == 0 and len(subfolders) > 0):
+        logging.warning("No python files found in "+folder+", searching detected subdirectories")
+        for folder in subfolders:
+            pythonFiles += findPythonFiles(folder)
+    if (len(pythonFiles) == 0 and len(zips) == 1): #only do this if there are still no files found
+        logging.warning("No python files found in "+folder+", attempting to unzip detected zip file")
         zipname = Path(os.path.abspath(zips[0])).stem() #get the basic name of the zip, which will be the new folder
         newFolder = os.path.join(folder, zipname)
         subprocess.run("tar -xf \""+os.path.abspath(zips[0])+"\" -C "+newFolder) #unzip
         assert os.path.isdir(newFolder) #debug
-        findPythonFiles(newFolder) #recursively find files in the new folder
+        pythonFiles += findPythonFiles(newFolder) #recursively find files in the new folder
     return pythonFiles
 
 def runTestsOnAssignment(assignmentPath, testCases):
