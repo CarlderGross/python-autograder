@@ -164,7 +164,15 @@ def runTestsOnAssignment(assignmentPath, testCases):
                 if (not targetFile): #if no file was identified as main
                     logging.error("Could not identify main file in "+studentFolder.name)
                     logging.error(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
-                    break #TODO: add interface to specify which file is desired
+                    msgbox = messagebox.askokcancel("File Not Found", "Could not identify main python file in "+studentFolder.name+"/"+latestRevision.name+": "+str(len(pythonFiles))+" found.\nManually select a file?")
+                    if (msgbox == "ok"):
+                        targetFile = filedialog.askopenfilename(parent=root, title="Manual File Identification", initialdir=latestRevision, filetypes=[("Python files", "*.py")])
+            
+            if (not targetFile):
+                logging.warning("No file provided for "+studentFolder.name+", tests automatically failed")
+                summary["Failed"] = summary["Total"]
+                summaryLines.append(summary)
+                continue
                         
             promptPattern = inputPromptPattern(targetFile)
             
