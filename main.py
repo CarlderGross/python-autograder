@@ -223,21 +223,22 @@ def runTestsOnAssignment(assignmentPath, testCases):
     
     return(summaryLines, flaggedLines)
 
-def saveToCsv(list_summaryLines, list_flaggedLines):
-    #TODO: make a new csv file each time the program is run
-    with open("summary.csv", "w", newline="") as summaryFile:
+def saveToCsv(list_summaryLines, list_flaggedLines, assignmentname):
+    savedir = assignmentname+" "+datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")
+    os.mkdir(savedir)
+    with open(savedir+"/summary.csv", "w", newline="") as summaryFile:
         summaryWriter = csv.DictWriter(summaryFile, fieldnames=SUMMARYTEMPLATE.keys())
         summaryWriter.writeheader()
         for line in list_summaryLines:
             summaryWriter.writerow(line)
     if (list_flaggedLines):
-        with open("flagged.csv", "w", newline="") as flagsFile:
+        with open(savedir+"/flagged.csv", "w", newline="") as flagsFile:
             flagWriter = csv.DictWriter(flagsFile, fieldnames=FLAGPARAMS)
             flagWriter.writeheader()
             currentName = list_flaggedLines[0]["Name"]
             for line in list_flaggedLines:
                 flagWriter.writerow(line)
-                if (line["Name"] != currentName): #separate students with empty rows for readability
+                if (line["Name"] != currentName): #use empty rows to separate students for readability
                     flagWriter.writerow(dict.fromkeys(FLAGPARAMS))
                     currentName = line["Name"]
 
@@ -348,7 +349,7 @@ def runTestsCallback(*args):
         logging.debug("Running tests...")
         try:
             summary, flagged = runTestsOnAssignment(assignmentPath.get(), tests)
-            saveToCsv(summary, flagged)
+            saveToCsv(summary, flagged, Path(assignmentPath.get()).stem)
             messagebox.showinfo(parent=root, title="Success", message="Tests run successfully!")
         except Exception as e:
             logging.critical(traceback.format_exc())
@@ -361,7 +362,7 @@ runTests_button = ttk.Button(main_frame, text="Run Tests", default="active", com
 runTests_button.grid(column=1, row=2, sticky=(S, E))
 
 root.mainloop()
-#save logs after root closes
+#copy latest log to dated log after root closes
 with open("logs/"+datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")+".log", mode="a") as permLog, open("logs/latest.log", mode="r") as latestLog:
     for line in latestLog:
         permLog.write(line)
