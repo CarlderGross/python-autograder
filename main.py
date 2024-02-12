@@ -188,10 +188,10 @@ def runTestsOnAssignment(assignmentPath, testCases):
                 try:
                     result = results[index]
                 except IndexError:
-                    logging.info("Fail: No output provided")
+                    logging.warning("Fail: No output provided")
                     summary["Failed"] += 1
                 else:
-                    logging.debug(result)
+                    logging.debug("Raw result: "+result)
                     #separate hardcoded prompts from actual output
                     if (promptPattern):
                         result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
@@ -201,10 +201,15 @@ def runTestsOnAssignment(assignmentPath, testCases):
                         fakesplit = [""]
                         fakesplit.append(result)
                         result = fakesplit
-                    
-                    logging.debug(result)
-                    for i, item in enumerate(result): #clean the results of excess newlines
-                        result[i] = item.strip()
+                        
+                    logging.debug("Split by prompt: "+str(result))
+                    for i in range(len(result)): #clean the results of excess newlines
+                        sav_item = result.pop(i)
+                        sav_item = sav_item.strip()
+                        spl_sav_item = sav_item.split("\n") #also, separate the results by line
+                        logging.debug("Split by line: "+str(spl_sav_item))
+                        for j, element in enumerate(spl_sav_item):
+                            result.insert(i+j, element.strip())
                     
                     #use tuple comparison to identify passed or failed cases
                     logging.debug(result)
