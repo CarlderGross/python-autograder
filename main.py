@@ -41,7 +41,7 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
                     if (len(inputLines) == len(outputLines)):
                         for j, in_line in enumerate(inputLines):
                             tup_ins = tuple(shlex.split(in_line)) #use shlex to prevent splitting of string literals with spaces in them
-                            tup_outs = tuple(shlex.split(outputLines[j])) #TODO: make sure this makes sense with the output files
+                            tup_outs = tuple(shlex.split(outputLines[j]))
                             finalDict[tup_ins] = tup_outs
                     else:
                         raise ValueError(f"Inputs file at index {i} has a different number of test cases than associated outputs file. Check your file order to make sure they are associated correctly.")
@@ -59,7 +59,7 @@ def buildTestCases(expectedOutFiles, dataFiles=None):
             with open(file) as outsFile:
                 lines = outsFile.readlines()
                 for line in lines:
-                    tup_outs = tuple(shlex.split(line)) #TODO: make sure this makes sense with the output files
+                    tup_outs = tuple(shlex.split(line))
                     outputsList.append(tup_outs)
         return outputsList
 
@@ -105,18 +105,25 @@ def inputPromptPattern(file): #parses a python file, and returns a regex pattern
 def findPythonFiles(folder):
     pythonFiles = []
     zips = []
+    subfolders = []
     for file in os.scandir(folder):
         if (re.match(".*\\.py", file.name)): #must escape backslash to allow it to appear in regex string
             pythonFiles.append(file)
         elif (re.match(".*\\.zip", file.name)):
             zips.append(file)
-    if (len(pythonFiles) == 0) and (len(zips) == 1):
-        logging.warning("No python file found in "+folder+", attempting to unzip detected zip file")
+        elif (os.path.isdir(file)):
+            subfolders.append(file)
+    if (len(pythonFiles) == 0 and len(subfolders) > 0):
+        logging.warning("No python files found in "+folder+", searching detected subdirectories")
+        for folder in subfolders:
+            pythonFiles += findPythonFiles(folder)
+    if (len(pythonFiles) == 0 and len(zips) == 1): #only do this if there are still no files found
+        logging.warning("No python files found in "+folder+", attempting to unzip detected zip file")
         zipname = Path(os.path.abspath(zips[0])).stem() #get the basic name of the zip, which will be the new folder
         newFolder = os.path.join(folder, zipname)
         subprocess.run("tar -xf \""+os.path.abspath(zips[0])+"\" -C "+newFolder) #unzip
         assert os.path.isdir(newFolder) #debug
-        findPythonFiles(newFolder) #recursively find files in the new folder
+        pythonFiles += findPythonFiles(newFolder) #recursively find files in the new folder
     return pythonFiles
 
 def runTestsOnAssignment(assignmentPath, testCases):
@@ -157,7 +164,15 @@ def runTestsOnAssignment(assignmentPath, testCases):
                 if (not targetFile): #if no file was identified as main
                     logging.error("Could not identify main file in "+studentFolder.name)
                     logging.error(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
-                    break #TODO: add interface to specify which file is desired
+                    msgbox = messagebox.askokcancel("File Not Found", "Could not identify main python file in "+studentFolder.name+"/"+latestRevision.name+": "+str(len(pythonFiles))+" found.\nManually select a file?")
+                    if (msgbox == "ok"):
+                        targetFile = filedialog.askopenfilename(parent=root, title="Manual File Identification", initialdir=latestRevision, filetypes=[("Python files", "*.py")])
+            
+            if (not targetFile):
+                logging.warning("No file provided for "+studentFolder.name+", tests automatically failed")
+                summary["Failed"] = summary["Total"]
+                summaryLines.append(summary)
+                continue
                         
             promptPattern = inputPromptPattern(targetFile)
             
@@ -173,10 +188,10 @@ def runTestsOnAssignment(assignmentPath, testCases):
                 try:
                     result = results[index]
                 except IndexError:
-                    logging.info("Fail: No output provided")
+                    logging.warning("Fail: No output provided")
                     summary["Failed"] += 1
                 else:
-                    logging.debug(result)
+                    logging.debug("Raw result: "+result)
                     #separate hardcoded prompts from actual output
                     if (promptPattern):
                         result = re.split(promptPattern, result) #split the string along all known input prompts, leaving only the outputs
@@ -186,10 +201,15 @@ def runTestsOnAssignment(assignmentPath, testCases):
                         fakesplit = [""]
                         fakesplit.append(result)
                         result = fakesplit
-                    
-                    logging.debug(result)
-                    for i, item in enumerate(result): #clean the results of excess newlines
-                        result[i] = item.strip()
+                        
+                    logging.debug("Split by prompt: "+str(result))
+                    for i in range(len(result)): #clean the results of excess newlines
+                        sav_item = result.pop(i)
+                        sav_item = sav_item.strip()
+                        spl_sav_item = sav_item.split("\n") #also, separate the results by line
+                        logging.debug("Split by line: "+str(spl_sav_item))
+                        for j, element in enumerate(spl_sav_item):
+                            result.insert(i+j, element.strip())
                     
                     #use tuple comparison to identify passed or failed cases
                     logging.debug(result)
@@ -223,21 +243,22 @@ def runTestsOnAssignment(assignmentPath, testCases):
     
     return(summaryLines, flaggedLines)
 
-def saveToCsv(list_summaryLines, list_flaggedLines):
-    #TODO: make a new csv file each time the program is run
-    with open("summary.csv", "w", newline="") as summaryFile:
+def saveToCsv(list_summaryLines, list_flaggedLines, assignmentname):
+    savedir = assignmentname+" "+datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")
+    os.mkdir(savedir)
+    with open(savedir+"/summary.csv", "w", newline="") as summaryFile:
         summaryWriter = csv.DictWriter(summaryFile, fieldnames=SUMMARYTEMPLATE.keys())
         summaryWriter.writeheader()
         for line in list_summaryLines:
             summaryWriter.writerow(line)
     if (list_flaggedLines):
-        with open("flagged.csv", "w", newline="") as flagsFile:
+        with open(savedir+"/flagged.csv", "w", newline="") as flagsFile:
             flagWriter = csv.DictWriter(flagsFile, fieldnames=FLAGPARAMS)
             flagWriter.writeheader()
             currentName = list_flaggedLines[0]["Name"]
             for line in list_flaggedLines:
                 flagWriter.writerow(line)
-                if (line["Name"] != currentName): #separate students with empty rows for readability
+                if (line["Name"] != currentName): #use empty rows to separate students for readability
                     flagWriter.writerow(dict.fromkeys(FLAGPARAMS))
                     currentName = line["Name"]
 
@@ -352,7 +373,7 @@ def runTestsCallback(*args):
         logging.debug("Running tests...")
         try:
             summary, flagged = runTestsOnAssignment(assignmentPath.get(), tests)
-            saveToCsv(summary, flagged)
+            saveToCsv(summary, flagged, Path(assignmentPath.get()).stem)
             messagebox.showinfo(parent=root, title="Success", message="Tests run successfully!")
         except Exception as e:
             logging.critical(traceback.format_exc())
@@ -365,7 +386,7 @@ runTests_button = ttk.Button(main_frame, text="Run Tests", default="active", com
 runTests_button.grid(column=1, row=2, sticky=(S, E))
 
 root.mainloop()
-#save logs after root closes
+#copy latest log to dated log after root closes
 with open("logs/"+datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")+".log", mode="a") as permLog, open("logs/latest.log", mode="r") as latestLog:
     for line in latestLog:
         permLog.write(line)
