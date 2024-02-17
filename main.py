@@ -287,7 +287,7 @@ def redrawInputFiles():
     for index, element in enumerate(inputFiles):
         elementLabel = ttk.Label(inlist_frame, text=os.path.abspath(element))
         elementLabel.grid(column=0, row=index+1, sticky=(W))
-        removalButton = ttk.Button(inlist_frame, text="X", width=1.1, command=lambda: removeInputFile(index))
+        removalButton = ttk.Button(inlist_frame, text="X", width=1.1, command=lambda bind_index=index: removeInputFile(bind_index)) #need to bind the index value to a local variable, because otherwise index is passed by reference
         removalButton.grid(column=1, row=index+1, sticky=W)
         
 def redrawOutputFiles():
@@ -297,7 +297,7 @@ def redrawOutputFiles():
     for index, element in enumerate(outputFiles):
         elementLabel = ttk.Label(outlist_frame, text=os.path.abspath(element))
         elementLabel.grid(column=0, row=index+1, sticky=(N, W))
-        removalButton = ttk.Button(outlist_frame, text="X", width=1.1, command=lambda: removeOutputFile(index))
+        removalButton = ttk.Button(outlist_frame, text="X", width=1.1, command=lambda bind_index=index: removeOutputFile(bind_index))
         removalButton.grid(column=1, row=index+1, sticky=W)
         
 #whenever the list changes, we need to redraw it
@@ -312,10 +312,14 @@ def addOutputFiles(*args):
     redrawOutputFiles()
     
 def removeInputFile(index):
+    logging.debug(index)
+    logging.debug("Removing "+inputFiles[index]+" from list")
     del inputFiles[index]
     redrawInputFiles()
     
 def removeOutputFile(index):
+    logging.debug(index)
+    logging.debug("Removing "+outputFiles[index]+" from list")
     del outputFiles[index]
     redrawOutputFiles()
 
