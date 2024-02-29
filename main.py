@@ -24,7 +24,7 @@ FLAGPARAMS = ["Name", "Input", "Expected", "Actual"]
 import logging #apparently it works better here?
 if(not os.path.isdir("logs")):
     os.mkdir("logs")
-logging.basicConfig(filename="logs/latest.log", filemode="w", level=logging.DEBUG, format="%(levelname)s:%(message)s", force=True)
+logging.basicConfig(filename="logs/latest.log", filemode="w", level=logging.INFO, format="%(levelname)s:%(message)s", force=True)
 
 def buildTestCases(expectedOutFiles, dataFiles=None):
     #Raises ValueError when it cannot match all inputs to outputs
