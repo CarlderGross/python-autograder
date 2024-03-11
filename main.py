@@ -73,7 +73,12 @@ def runPythonTests(filePath, testInputs=None):
                 inputBuffer += str(item)+"\n" #files being tested are probably using input() which requests a string, but stdin expects bytes to be written to it
                 #run the subprocess, with stdin as the input stream
             runningFile = subprocess.Popen("py \""+filePath+"\"", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            output = runningFile.communicate(inputBuffer, timeout=60) #will be a tuple, with the second value as None
+            try:
+                output = runningFile.communicate(inputBuffer, timeout=60) #will be a tuple, with the second value as None
+            except subprocess.TimeoutExpired:
+                logging.warning("Timeout expired on "+filePath)
+                runningFile.kill()
+                output = runningFile.communicate() #finish communication, no additional data needs to be sent
             #anything using normal python input (which is most things) will throw EOFError after all test cases have been read; this is probably fine
             runningFile.terminate()
             outputs.append(output[0])
