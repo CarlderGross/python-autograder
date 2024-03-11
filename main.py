@@ -75,12 +75,12 @@ def runPythonTests(filePath, testInputs=None):
             runningFile = subprocess.Popen("py \""+filePath+"\"", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             try:
                 output = runningFile.communicate(inputBuffer, timeout=60) #will be a tuple, with the second value as None
+                runningFile.terminate()
             except subprocess.TimeoutExpired:
                 logging.warning("Timeout expired on "+filePath)
                 output = runningFile.stdout.read() #collect whatever data made it through before timeout
                 runningFile.kill()
             #anything using normal python input (which is most things) will throw EOFError after all test cases have been read; this is probably fine
-            runningFile.terminate()
             outputs.append(output[0])
     else:
         output_process = subprocess.run("py \""+filePath+"\"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=100)
@@ -171,6 +171,7 @@ def runTestsOnAssignment(assignmentPath, testCases):
                     logging.error(str(len(pythonFiles))+" python files in "+studentFolder.name+"/"+latestRevision.name)
                     msgbox = messagebox.askokcancel("File Not Found", "Could not identify main python file in "+studentFolder.name+"/"+latestRevision.name+": "+str(len(pythonFiles))+" found.\nManually select a file?")
                     if (msgbox == "ok"):
+                        logging.debug("Opening manual file selection box")
                         targetFile = filedialog.askopenfilename(parent=root, title="Manual File Identification", initialdir=latestRevision, filetypes=[("Python files", "*.py")])
             
             if (not targetFile):
